@@ -26,7 +26,7 @@ For example, to map from [BT.2020, PQ\] (HDR) to traditional [BT.709, BT.1886\] 
 - ``tone_mapping_algo, tone_mapping_param, desaturation_strength, desaturation_exponent, desaturation_base, max_boost, gamut_warning``:
  [Color mapping params](https://github.com/haasn/libplacebo/blob/master/src/include/libplacebo/shaders/colorspace.h#L199).
 
-#### ``placebo.Resample(clip clip[, int width, int height, string filter = "ewa_lanczos", float radius, float clamp, float taper, float blur, float param1, float param2, float sx = 0.0, float sy = 0.0, float antiring = 0.0, int lut_entries = 64, float cutoff = 0.001, bool sigmoidize = 1, bool linearize = 1, float sigmoid_center = 0.75, float sigmoid_slope = 6.5, int trc = 1])``
+#### ``placebo.Resample(clip clip[, int width, int height, string filter = "ewa_lanczos", float radius, float clamp, float taper, float blur, float param1, float param2, float sx = 0.0, float sy = 0.0, float antiring = 0.0, int lut_entries = 64, float cutoff = 0.001, bool sigmoidize = 1, bool linearize = 1, float sigmoid_center = 0.75, float sigmoid_slope = 6.5, int primaries = 3, int trc = 1, int light = 1])``
 
 Input needs to be 8 or 16 bit Integer or 32 bit Float   
 
@@ -40,7 +40,9 @@ Enabled by default for RGB, disabled for YCbCr because NCL YCbCr can’t be corr
 Defaults to disabled for GRAY since it may be a YCbCr plane, but can be manually enabled. 
 When sigmodizing, ``linearize`` should be True as well. (Currently mangles HDR video, so disable for that.) 
 - ``sigmoid_center, sigmoid_slope``: Sigmoid curve parameters.
-- ``trc``: The [transfer curve](https://github.com/haasn/libplacebo/blob/master/src/include/libplacebo/colorspace.h#L183) to use for linearizing.
+- ``primaries``: The [color primaries](https://github.com/haasn/libplacebo/blob/master/src/include/libplacebo/colorspace.h#L164) to use for linearizing.
+- ``trc``: The [transfer curve](https://github.com/haasn/libplacebo/blob/master/src/include/libplacebo/colorspace.h#L194) to use for linearizing.
+- ``light``: The [light parameters](https://github.com/haasn/libplacebo/blob/master/src/include/libplacebo/colorspace.h#L249) to use for linearizing.
 
 #### ``placebo.Shader(clip clip, [string shader, int width, int height, int chroma_loc = 1, int matrix = 2, int trc = 1, string filter = "ewa_lanczos", float radius, float clamp, float taper, float blur, float param1, float param2, float antiring = 0.0, int lut_entries = 64, float cutoff = 0.001, bool sigmoidize = 1, bool linearize = 1, float sigmoid_center = 0.75, float sigmoid_slope = 6.5, string shader_s])``
 

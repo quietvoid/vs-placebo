@@ -21,7 +21,9 @@ typedef struct {
     struct pl_sample_filter_params *sampleParams;
     struct pl_shader_obj *lut;
     struct pl_sigmoid_params * sigmoid_params;
-    enum pl_color_transfer trc;
+
+    struct pl_color_space color;
+
     bool linear;
     pthread_mutex_t lock;
 } RData;
@@ -48,7 +50,7 @@ bool do_plane_R(struct priv *p, void* data, int w, int h, const VSAPI *vsapi, fl
 
     pl_shader_sample_direct(ish, &src);
     if (d->linear)
-        pl_shader_linearize(ish, d->trc);
+        pl_shader_linearize(ish, d->color);
 
     if (d->sigmoid_params)
         pl_shader_sigmoidize(ish, d->sigmoid_params);
@@ -103,7 +105,7 @@ bool do_plane_R(struct priv *p, void* data, int w, int h, const VSAPI *vsapi, fl
         pl_shader_unsigmoidize(sh, d->sigmoid_params);
 
     if (d->linear)
-        pl_shader_delinearize(sh, d->trc);
+        pl_shader_delinearize(sh, d->color);
 
 
     bool ok = pl_dispatch_finish(p->dp, &(struct pl_dispatch_params) {.target = p->tex_out[0], .shader = &sh});
@@ -302,8 +304,17 @@ void VS_CC ResampleCreate(const VSMap *in, VSMap *out, void *userData, VSCore *c
     if (err) d.linear = d.vi->format->colorFamily == cmRGB;
     // allow linearizing Gray manually, though, if the user knows what he’s doing
     d.linear = d.linear && (d.vi->format->colorFamily == cmRGB || d.vi->format->colorFamily == cmGray);
-    d.trc = vsapi->propGetInt(in, "trc", 0, &err);
-    if (err) d.trc = 1;
+
+    // refer to colorspace.h
+    d.color.primaries = vsapi->propGetInt(in, "primaries", 0, &err);
+    if (err) d.color.primaries = PL_COLOR_PRIM_BT_709;
+
+    // staying trc for backwards compatibility reasons
+    d.color.transfer = vsapi->propGetInt(in, "trc", 0, &err);
+    if (err) d.color.transfer = PL_COLOR_TRC_BT_1886;
+
+    d.color.light = vsapi->propGetInt(in, "light", 0, &err);
+    if (err) d.color.light = PL_COLOR_LIGHT_DISPLAY;
 
     struct pl_sigmoid_params *sigmoidParams = malloc(sizeof(struct pl_sigmoid_params));
     sigmoidParams->center = vsapi->propGetFloat(in, "sigmoid_center", 0, &err);
