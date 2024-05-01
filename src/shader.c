@@ -189,7 +189,7 @@ static const VSFrame *VS_CC VSPlaceboShaderGetFrame(int n, int activationReason,
                 d->range = r ? PL_COLOR_LEVELS_TV : PL_COLOR_LEVELS_PC;
         }
 
-        const VSVideoFormat dstfmt = d->vi_out.format;
+        VSVideoFormat dstfmt = d->vi_out.format;
         vsapi->queryVideoFormat(&dstfmt, dstfmt.colorFamily, dstfmt.sampleType, dstfmt.bitsPerSample, 0, 0, core);
 
         VSFrame *dst = vsapi->newVideoFrame(&dstfmt, d->width, d->height, frame, core);
@@ -300,7 +300,7 @@ void VS_CC VSPlaceboShaderCreate(const VSMap *in, VSMap *out, void *userData, VS
         }
         fsize =  strlen(shader_s);
         shader = malloc(fsize + 1);
-        strcpy_s(shader, fsize + 1, shader_s);
+        strcpy(shader, shader_s);
     }
 
     d.node = vsapi->mapGetNode(in, "clip", 0, 0);
