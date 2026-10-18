@@ -17,7 +17,6 @@ static struct pl_dovi_metadata *create_dovi_meta(DoviRpuOpaque *rpu, const DoviR
         goto skip_mapping;
 
     const uint8_t bl_bit_depth = hdr->bl_bit_depth_minus8 + 8;
-    const float coef_scale_d = 1.0f / (1ULL << hdr->coefficient_log2_denom);
 
     for (int c = 0; c < 3; c++) {
         const DoviReshapingCurve curve = mapping->curves[c];
@@ -41,28 +40,28 @@ static struct pl_dovi_metadata *create_dovi_meta(DoviRpuOpaque *rpu, const DoviR
                 for (int k = 0; k <= poly_curve->poly_order_minus1.data[i] + 1; k++) {
                     int64_t ipart = poly_curve->poly_coef_int.list[i]->data[k];
                     uint64_t fpart = poly_curve->poly_coef.list[i]->data[k];
-                    cmp->poly_coeffs[i][k] = ipart + coef_scale_d * fpart;
+                    cmp->poly_coeffs[i][k] = (ipart << hdr->coefficient_log2_denom) | fpart;
                 }
             } else if (curve.mmr) {
                 const DoviMMRCurve *mmr_curve = curve.mmr;
 
                 int64_t ipart = mmr_curve->mmr_constant_int.data[i];
                 uint64_t fpart = mmr_curve->mmr_constant.data[i];
-                cmp->mmr_constant[i] = ipart + coef_scale_d * fpart;
+                cmp->mmr_constant[i] = (ipart << hdr->coefficient_log2_denom) | fpart;
                 cmp->mmr_order[i] = mmr_curve->mmr_order_minus1.data[i] + 1;
 
                 for (int j = 0; j < cmp->mmr_order[i]; j++) {
                     for (int k = 0; k < 7; k++) {
                         ipart = mmr_curve->mmr_coef_int.list[i]->list[j]->data[k];
                         fpart = mmr_curve->mmr_coef.list[i]->list[j]->data[k];
-                        cmp->mmr_coeffs[i][j][k] = ipart + coef_scale_d * fpart;
+                        cmp->mmr_coeffs[i][j][k] = (ipart << hdr->coefficient_log2_denom) | fpart;
                     }
                 }
             }
         }
     }
 
-#if PL_API_VER >= 369
+#if PL_API_VER >= 377
     // See `pl_map_dovi_metadata` for documentation
     // Re-implemented using libdovi
     dovi_meta.nlq_active = el_present && !hdr->disable_residual_flag &&
@@ -70,25 +69,30 @@ static struct pl_dovi_metadata *create_dovi_meta(DoviRpuOpaque *rpu, const DoviR
                            mapping->nlq_method_idc == 0; // LINEAR_DZ NLQ
 
     if (dovi_meta.nlq_active && mapping->nlq) {
+        const float coef_scale = 1.0f / (1ULL << hdr->coefficient_log2_denom);
+
         const uint8_t el_bit_depth = hdr->el_bit_depth_minus8 + 8;
         const float el_scale = 1.0f / ((1 << el_bit_depth) - 1);
-
-        const double slope_scale_d = ((1ULL << el_bit_depth) - 1) * coef_scale_d;
 
         const DoviRpuDataNlq *src = mapping->nlq;
         for (int c = 0; c < 3; c++) {
             struct pl_dovi_nlq_data *dst = &dovi_meta.nlq[c];
 
+            uint64_t vdr_in_max_ipart = src->vdr_in_max_int[c];
+            uint64_t vdr_in_max_fpart = src->vdr_in_max[c];
             uint64_t slope_ipart = src->linear_deadzone_slope_int[c];
             uint64_t slope_fpart = src->linear_deadzone_slope[c];
             uint64_t thr_ipart = src->linear_deadzone_threshold_int[c];
             uint64_t thr_fpart = src->linear_deadzone_threshold[c];
 
-            const double S = (slope_ipart << hdr->coefficient_log2_denom) | slope_fpart;
-            const double T = (thr_ipart << hdr->coefficient_log2_denom) | thr_fpart;
-            dst->offset = el_scale * src->nlq_offset[c];
-            dst->deadzone_slope = slope_scale_d * S;
-            dst->deadzone_threshold = coef_scale_d * (T - 0.5 * S);
+            const double linear_deadzone_slope = (slope_ipart << hdr->coefficient_log2_denom) | slope_fpart;
+            const double linear_deadzone_threshold = (thr_ipart << hdr->coefficient_log2_denom) | thr_fpart;
+            const double vdr_in_max = (vdr_in_max_ipart << hdr->coefficient_log2_denom) | vdr_in_max_fpart;
+
+            dst->offset = src->nlq_offset[c];
+            dst->deadzone_slope = coef_scale * linear_deadzone_slope;
+            dst->deadzone_threshold = coef_scale * linear_deadzone_threshold;
+            dst->hdr_in_max = coef_scale * vdr_in_max;
         }
     }
 #endif
